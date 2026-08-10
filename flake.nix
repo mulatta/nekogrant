@@ -17,7 +17,6 @@
       systems = [
         "x86_64-linux"
         "aarch64-linux"
-        "aarch64-darwin"
       ];
 
       eachSystem =
@@ -32,14 +31,7 @@
 
       treefmtEval = eachSystem (
         { pkgs, ... }:
-        treefmt-nix.lib.evalModule pkgs {
-          projectRootFile = "flake.nix";
-          programs = {
-            deadnix.enable = true;
-            nixfmt.enable = true;
-            statix.enable = true;
-          };
-        }
+        treefmt-nix.lib.evalModule pkgs ./treefmt.nix
       );
     in
     {
@@ -47,6 +39,16 @@
         { system, ... }:
         {
           formatting = treefmtEval.${system}.config.build.check self;
+        }
+      );
+
+      devShells = eachSystem (
+        { pkgs, system }:
+        {
+          default = import ./devshell.nix {
+            inherit pkgs;
+            treefmt = treefmtEval.${system}.config.build.wrapper;
+          };
         }
       );
 
