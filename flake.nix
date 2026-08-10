@@ -52,6 +52,13 @@
         }
       );
 
+      packages = eachSystem (
+        { pkgs, ... }:
+        {
+          neko-image = pkgs.callPackage ./packages/neko-image { };
+        }
+      );
+
       formatter = eachSystem ({ system, ... }: treefmtEval.${system}.config.build.wrapper);
     };
 }
