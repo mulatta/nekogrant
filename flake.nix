@@ -19,24 +19,24 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system nixpkgs.legacyPackages.${system});
     in
     {
+      nixosModules = import ./nix/nixosModules;
+
       packages = forAllSystems (_: pkgs: import ./nix/packages { inherit pkgs; });
 
       checks = forAllSystems (
         system: pkgs:
-        let
+        import ./nix/checks {
+          inherit pkgs;
+          inherit (nixpkgs) lib;
+          modules = inputs.self.nixosModules;
           selfPackages = inputs.self.packages.${system};
-          packageChecks = pkgs.lib.mapAttrs' (
-            name: package: pkgs.lib.nameValuePair "pkgs-${name}" package
-          ) selfPackages;
-          formatter = import ./nix/formatter {
-            inherit pkgs;
-            inherit (inputs) treefmt-nix;
-          };
-        in
-        {
-          pkgs-formatting = formatter.check inputs.self;
+          treefmtCheck =
+            (import ./nix/formatter {
+              inherit pkgs;
+              inherit (inputs) treefmt-nix;
+            }).check
+              inputs.self;
         }
-        // packageChecks
       );
 
       devShells = forAllSystems (
