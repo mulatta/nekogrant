@@ -1,5 +1,5 @@
 {
-  description = "Pawse - shared browser handoff for humans and agents";
+  description = "NekoGrant - shared browser authority for humans and agents";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
