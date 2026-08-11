@@ -8,57 +8,55 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      treefmt-nix,
-    }:
+    inputs@{ nixpkgs, ... }:
     let
       systems = [
         "x86_64-linux"
         "aarch64-linux"
+        "aarch64-darwin"
       ];
 
-      eachSystem =
-        f:
-        nixpkgs.lib.genAttrs systems (
-          system:
-          f {
-            inherit system;
-            pkgs = nixpkgs.legacyPackages.${system};
-          }
-        );
-
-      treefmtEval = eachSystem (
-        { pkgs, ... }:
-        treefmt-nix.lib.evalModule pkgs ./treefmt.nix
-      );
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system nixpkgs.legacyPackages.${system});
     in
     {
-      checks = eachSystem (
-        { system, ... }:
-        {
-          formatting = treefmtEval.${system}.config.build.check self;
-        }
-      );
+      packages = forAllSystems (_: pkgs: import ./nix/packages { inherit pkgs; });
 
-      devShells = eachSystem (
-        { pkgs, system }:
-        {
-          default = import ./devshell.nix {
+      checks = forAllSystems (
+        system: pkgs:
+        let
+          selfPackages = inputs.self.packages.${system};
+          packageChecks = pkgs.lib.mapAttrs' (
+            name: package: pkgs.lib.nameValuePair "pkgs-${name}" package
+          ) selfPackages;
+          formatter = import ./nix/formatter {
             inherit pkgs;
-            treefmt = treefmtEval.${system}.config.build.wrapper;
+            inherit (inputs) treefmt-nix;
           };
-        }
-      );
-
-      packages = eachSystem (
-        { pkgs, ... }:
+        in
         {
-          neko-image = pkgs.callPackage ./packages/neko-image { };
+          pkgs-formatting = formatter.check inputs.self;
+        }
+        // packageChecks
+      );
+
+      devShells = forAllSystems (
+        _: pkgs:
+        import ./nix/devshells {
+          inherit pkgs;
+          treefmt =
+            (import ./nix/formatter {
+              inherit pkgs;
+              inherit (inputs) treefmt-nix;
+            }).wrapper;
         }
       );
 
-      formatter = eachSystem ({ system, ... }: treefmtEval.${system}.config.build.wrapper);
+      formatter = forAllSystems (
+        _: pkgs:
+        (import ./nix/formatter {
+          inherit pkgs;
+          inherit (inputs) treefmt-nix;
+        }).wrapper
+      );
     };
 }
